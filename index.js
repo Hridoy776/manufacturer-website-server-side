@@ -41,6 +41,18 @@ async function run() {
         const userCollection = client.db('DrillDestructor').collection('users');
         const orderCollection = client.db('DrillDestructor').collection('orders');
 
+        const AdminVerify = async (req, res, next) => {
+            const requester = req.decoded.email;
+            const requesterAccount = await userCollection.findOne({
+              email: requester,
+            });
+            if (requesterAccount.role === "admin") {
+              next();
+            } else {
+              res.status(403).send({ message: "forbidden" });
+            }
+          };
+
         app.get('/tools', async (req, res) => {
             const query = {}
             const result = await toolCollection.find(query).toArray()
