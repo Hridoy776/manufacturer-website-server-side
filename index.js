@@ -111,6 +111,33 @@ async function run() {
             res.send(result)
 
         })
+        app.get('/user', async (req, res) => {
+            
+            const query = {}
+
+            const result = await userCollection.find(query).toArray()
+            res.send(result)
+
+        })
+
+        app.put("/user/admin/:email", async (req, res) => {
+            const email = req.params.email;
+            const filter = { email };
+            const updateDoc = {
+              $set: { role: "admin" },
+            };
+            const result = await userCollection.updateOne(filter, updateDoc);
+            res.send(result);
+          });
+
+          app.get('/admin/:email',async(req,res)=>{
+              const email=req.params.email;
+              
+              const user=await userCollection.findOne({email})
+
+              const isAdmin = user.role ==="admin"
+              res.send({admin:isAdmin})
+          })
 
     } finally {
 
