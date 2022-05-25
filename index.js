@@ -1,6 +1,7 @@
 const express = require('express')
 const cors = require('cors');
 require("dotenv").config();
+const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express()
 const port = process.env.PORT || 5000;
@@ -18,6 +19,7 @@ async function run() {
         await client.connect()
         const toolCollection = client.db('DrillDestructor').collection('tools');
         const userCollection = client.db('DrillDestructor').collection('users');
+        const orderCollection = client.db('DrillDestructor').collection('orders');
 
         app.get('/tools', async (req, res) => {
             const query = {}
@@ -32,6 +34,21 @@ async function run() {
             res.send(result)
         })
 
+        app.post('/order', async (req, res) => {
+            const newOrder = req.body;
+
+
+            const result = await orderCollection.insertOne(newOrder)
+            res.send({ success: true, result })
+        })
+
+        app.get('/order', async (req, res) => {
+            const email = req.query.email;
+            const query = { email }
+            const result = await orderCollection.find(query).toArray()
+            res.send(result)
+        })
+
         app.put('/user/:email', async (req, res) => {
             const email = req.params.email;
             const user = req.body;
@@ -41,8 +58,23 @@ async function run() {
                 $set: user
             }
             const result = await userCollection.updateOne(filter, updateDoc, options)
-            res.send(result)
+            const token = jwt.sign(
+                { email: email },
+                process.env.ACCESS_TOKEN_SECRET,
+                { expiresIn: "1h" }
+            );
+            res.send({ result, token })
+            
 
+
+        })
+        app.get('/user/:email', async (req, res) => {
+            const email = req.params.email;
+            console.log(email)
+            const query = { email }
+            
+            const result = await userCollection.findOne(query)
+            res.send(result)
 
         })
 
