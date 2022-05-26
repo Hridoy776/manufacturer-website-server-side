@@ -214,6 +214,13 @@ async function run() {
             res.send(result)
         })
 
+        app.post('/reviews',async(req,res)=>{
+            const newReview=req.body;
+            
+            const result=await reviewCollection.insertOne(newReview)
+            res.send({result,success:true})
+        })
+
     } finally {
 
     }
