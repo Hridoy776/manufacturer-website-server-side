@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express()
 const port = process.env.PORT || 5000;
-
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY)
 app.use(cors())
 app.use(express.json())
 
@@ -17,7 +17,7 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 
 function JWtverify(req, res, next) {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader) {
         return res.status(401).send({ message: "UnAuthorized access" });
     }
@@ -39,19 +39,20 @@ async function run() {
         await client.connect()
         const toolCollection = client.db('DrillDestructor').collection('tools');
         const userCollection = client.db('DrillDestructor').collection('users');
+        const userInformationCollection = client.db('DrillDestructor').collection('information');
         const orderCollection = client.db('DrillDestructor').collection('orders');
 
         const AdminVerify = async (req, res, next) => {
             const requester = req.decoded.email;
             const requesterAccount = await userCollection.findOne({
-              email: requester,
+                email: requester,
             });
             if (requesterAccount.role === "admin") {
-              next();
+                next();
             } else {
-              res.status(403).send({ message: "forbidden" });
+                res.status(403).send({ message: "forbidden" });
             }
-          };
+        };
 
         app.get('/tools', async (req, res) => {
             const query = {}
@@ -76,12 +77,36 @@ async function run() {
 
         app.get('/order', JWtverify, async (req, res) => {
             const email = req.query.email;
-            const decodedEmail=req.decoded.email;
+            const decodedEmail = req.decoded.email;
             if (email === decodedEmail) {
-            const query = { email }
-            const result = await orderCollection.find(query).toArray()
-            res.send(result)}
+                const query = { email }
+                const result = await orderCollection.find(query).toArray()
+                res.send(result)
+            }
         })
+        app.get('/order/:id', JWtverify, async (req, res) => {
+            const id = req.params.id;
+            console.log(id)
+            const query = { _id: ObjectId(id) }
+            const result = await orderCollection.findOne(query)
+
+            res.send(result)
+        })
+
+        app.post("/create-payment-intent", JWtverify, async (req, res) => {
+            const { price } = req.body;
+            const amount = price * 100
+            // Create a PaymentIntent with the order amount and currency
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: "usd",
+                payment_method_types: ['card'],
+            });
+
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+        });
 
         app.put('/user/:email', async (req, res) => {
             const email = req.params.email;
@@ -102,7 +127,7 @@ async function run() {
 
 
         })
-        app.get('/user/:email',JWtverify, async (req, res) => {
+        app.get('/user/:email', JWtverify, async (req, res) => {
             const email = req.params.email;
             console.log(email)
             const query = { email }
@@ -111,8 +136,8 @@ async function run() {
             res.send(result)
 
         })
-        app.get('/user', async (req, res) => {
-            
+        app.get('/user', JWtverify, AdminVerify, async (req, res) => {
+
             const query = {}
 
             const result = await userCollection.find(query).toArray()
@@ -120,24 +145,37 @@ async function run() {
 
         })
 
-        app.put("/user/admin/:email", async (req, res) => {
+        app.put("/user/admin/:email", JWtverify, AdminVerify, async (req, res) => {
             const email = req.params.email;
             const filter = { email };
             const updateDoc = {
-              $set: { role: "admin" },
+                $set: { role: "admin" },
             };
             const result = await userCollection.updateOne(filter, updateDoc);
             res.send(result);
-          });
+        });
 
-          app.get('/admin/:email',async(req,res)=>{
-              const email=req.params.email;
-              
-              const user=await userCollection.findOne({email})
+        app.get('/admin/:email', async (req, res) => {
+            const email = req.params.email;
 
-              const isAdmin = user.role ==="admin"
-              res.send({admin:isAdmin})
-          })
+            const user = await userCollection.findOne({ email })
+
+            const isAdmin = user.role === "admin"
+            res.send({ admin: isAdmin })
+        })
+
+        app.put("/user/information/:email", JWtverify, async (req, res) => {
+            const email = req.params.email;
+            const information = req.body;
+            console.log(information)
+            const filter = { email };
+            const options = { upsert: true }
+            const updateDoc = {
+                $set: information,
+            };
+            const result = await userInformationCollection.updateOne(filter, updateDoc, options);
+            res.send(result);
+        });
 
     } finally {
 
