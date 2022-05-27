@@ -17,12 +17,12 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 
 function JWtverify(req, res, next) {
     const authHeader = req.headers.authorization;
-    console.log(authHeader)
+    
     if (!authHeader) {
         return res.status(401).send({ message: "UnAuthorized access" });
     }
     const token = authHeader.split(" ")[1];
-    console.log(token);
+    
     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
         if (err) {
             console.log(err);
@@ -77,21 +77,28 @@ async function run() {
             res.send({ success: true, result })
         })
 
+        app.get('/allorder/:email',JWtverify,  async (req, res) => {
+
+                const query = {}
+                const result = await orderCollection.find(query).toArray()
+                res.send(result)
+            
+        })
         app.get('/order', JWtverify, async (req, res) => {
             const email = req.query.email;
             const decodedEmail = req.decoded.email;
             if (email === decodedEmail) {
-                const query = { email }
+                const query = {email}
                 const result = await orderCollection.find(query).toArray()
                 res.send(result)
             }
         })
-        app.get('/order/:id', JWtverify, async (req, res) => {
+        app.get('/order/:id',  async (req, res) => {
             const id = req.params.id;
             console.log(id)
             const query = { _id: ObjectId(id) }
             const result = await orderCollection.findOne(query)
-
+            console.log(result)
             res.send(result)
         })
         app.patch('/order/:id', JWtverify, async (req, res) => {
@@ -101,12 +108,29 @@ async function run() {
             const updateDoc={
                 $set:{
                     paid:true,
+                    status:"panding",
                     transactionId:payment.transactionId,
                 }
             }
             const result = await orderCollection.updateOne(filter,updateDoc)
             const updatedOrder=await paymentCollection.insertOne(payment)
             res.send(updateDoc)
+        })
+
+        app.patch('/order/shipping/:id', JWtverify, async (req, res) => {
+            const id = req.params.id;
+            
+            const filter = { _id: ObjectId(id) }
+            const updateDoc={
+                $set:{
+                    paid:true,
+                    status:"shipped",
+                    
+                }
+            }
+            const result = await orderCollection.updateOne(filter,updateDoc)
+            
+            res.send(result)
         })
 
         app.delete('/order/:id', JWtverify, async (req, res) => {
@@ -136,14 +160,14 @@ async function run() {
         app.put('/user/:email', async (req, res) => {
             const email = req.params.email;
             const user = req.body;
-            console.log(user)
+            
             const filter = { email }
             const options = { upsert: true };
             const updateDoc = {
                 $set: user
             }
             const result = await userCollection.updateOne(filter, updateDoc, options)
-            console.log(result)
+            
             const token = jwt.sign(
                 { email: email },
                 process.env.ACCESS_TOKEN_SECRET,
@@ -157,8 +181,7 @@ async function run() {
         app.get('/user/:email', JWtverify, async (req, res) => {
             const email = req.params.email;
             const decodedEmail=req.decoded.email;
-            console.log(decodedEmail)
-            console.log(email)
+            
             const query = { email }
 
            if(email===decodedEmail){
