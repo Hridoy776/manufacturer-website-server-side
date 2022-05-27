@@ -61,6 +61,12 @@ async function run() {
             const result = await toolCollection.find(query).toArray()
             res.send(result)
         })
+        app.post('/tools', async (req, res) => {
+            const newTool=req.body;
+            
+            const result = await toolCollection.insertOne(newTool)
+            res.send({result,success:true})
+        })
 
         app.get('/tool/:id', async (req, res) => {
             const id = req.params.id;
